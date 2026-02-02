@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Horror Movies</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* Simple, readable default styles for a quick demo UI */
+    body { font-family: system-ui, Arial, sans-serif; margin: 2rem; color: #111; }
+    .row { margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; }
+    .movie { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: .5rem 0; background: #fafafa; }
+    label { display: inline-flex; align-items: center; gap: .5rem; }
+    input, select, button { padding: .4rem .6rem; }
+    h1 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <h1>Horror Movies</h1>
+
+  <!--
+    Control bar:
+    - Search by title (substring)
+    - Filter by genre
+    - Sort by title/year/scary/gore
+    - "Load" button triggers a fetch, but also fires on init()
+  -->
+  <div class="row">
+    <label>Search
+      <input id="q" placeholder="Title..." />
+    </label>
+
+    <label>Genre
+      <select id="genre"></select>
+    </label>
+
+    <label>Order
+      <select id="order">
+        <option value="title_asc">Title</option>
+        <option value="year_desc">Year ↓</option>
+        <option value="scary_desc">Scary ↓</option>
+        <option value="gore_desc">Gore ↓</option>
+      </select>
+    </label>
+
+    <button id="load">Load</button>
+  </div>
+
+  <!-- Container that will be populated with results -->
+  <div id="movies"></div>
+
+  <script type="module">
+    // We use a JavaScript module so we can import config cleanly
+    import { API_BASE_URL } from './config.js';
+
+    // Cache DOM elements once for faster access
+    const elQ = document.getElementById('q');
+    const elGenre = document.getElementById('genre');
+    const elOrder = document.getElementById('order');
+    const elMovies = document.getElementById('movies');
+
+    // Hook up the button; we also call load() during init()
+    document.getElementById('load').addEventListener('click', load);
+
+    // Initialize UI state: populate dropdowns, then load results
+    init();
+
+    async function init() {
+      await populateGenres();
+      await load(); // initial fetch
+    }
+
+    /**
+     * Fetches the list of genres from the API and populates the <select>.
+     * The backend returns an array of { id, name }.
+     */
+    async function populateGenres() {
+      // Start with an "All" option to remove the filter
+      elGenre.innerHTML = '<option value="">All</option>';
+
+      const res = await fetch(`${API_BASE_URL}/genres`);
+      if (!res.ok) {
+        console.error('Failed to load genres', res.status);
+        return;
+      }
+      const genres = await res.json();
+
+      // Add <option> for each genre
+      genres.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.id;
+        opt.textContent = g.name;
+        elGenre.appendChild(opt);
+      });
+    }
+
+    /**
+     * Fetches the list of movies with the current filters applied.
+     * Query params are built using URLSearchParams, which keeps the code tidy.
+     * Renders the results into #movies.
+     */
+    async function load() {
+      const params = new URLSearchParams();
+      if (elQ.value) params.set('q', elQ.value);
+      if (elGenre.value) params.set('genre_id', elGenre.value);
+      params.set('order', elOrder.value);
+
+      const res = await fetch(`${API_BASE_URL}/movies?${params.toString()}`);
+      if (!res.ok) {
+        elMovies.innerHTML = `<p style="color:#b00">Failed to load movies (status ${res.status}).</p>`;
+        return;
+      }
+      const data = await res.json();
+
+      // Clear old content and render result cards
+      elMovies.innerHTML = '';
+      data.forEach(m => {
+        const d = document.createElement('div');
+        d.className = 'movie';
+
+        // Gracefully handle missing values (e.g., null synopsis)
+        const title = m.title || '(untitled)';
+        const year = m.release_year ? ` (${m.release_year})` : '';
+        const scary = Number.isFinite(m.scary_level) ? m.scary_level : '—';
+        const gore = Number.isFinite(m.gore_level) ? m.gore_level : '—';
+        const genres = (m.genre_objects || []).map(g => g.name).join(', ');
+        const synopsis = m.synopsis ?? '';
+
+        d.innerHTML = `
+          <h2>${title}${year}</h2>
+          <p><b>Scary:</b> ${scary}/5 &nbsp; | &nbsp; <b>Gore:</b> ${gore}/5</p>
+          <p><b>Genres:</b> ${genres || '—'}</p>
+          <p>${synopsis}</p>
+        `;
+        elMovies.appendChild(d);
+      });
+    }
+  </script>
+</body>
+</html>
