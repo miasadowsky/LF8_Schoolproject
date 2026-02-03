@@ -1,8 +1,5 @@
 import sqlite3
-from passlib.hash import argon2
-import secrets_handling
-from pprint import pprint
-from tabulate import tabulate
+
 
 DB_FILE = "horror.db"
 
