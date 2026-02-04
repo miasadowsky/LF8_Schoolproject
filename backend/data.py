@@ -10,11 +10,6 @@ cur = con.cursor()
 
 ## Create tables
 
-print("This script creates the required db tables.")
-print("Existing tables are not changed.")
-print("WARNING: schema changes are not applied!")
-## For now no migration script exists. Please delete the old db when needed
-print()
 
 cur.execute("""CREATE TABLE IF NOT EXISTS genres ( 
 	genreid INTEGER NOT NULL PRIMARY KEY,

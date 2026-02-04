@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from .config import settings
 from . import data
+import sqlite3
+
+DB_FILE = "horror.db"
 
 """
 FastAPI application exposing a mock API:
@@ -25,6 +28,8 @@ app = FastAPI(title="Horror Movie Facts (Mock)", version="0.1.0")
 # - This allows opening frontend/index.html directly from file://
 # - and lets the browser call http://127.0.0.1:8000 without being blocked.
 # IMPORTANT: In production it should be restrict allow_origins to known hosts
+# http://127.0.0.1:8000/docs für API Doku
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],    # DEV ONLY: allow all origins for simplicity
@@ -45,13 +50,16 @@ def health():
 
 @app.get("/genres")
 def list_genres():
-    """
-    Return the mock genre list as-is.
+    con = sqlite3.connect(DB_FILE)
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
 
-    Response shape (array):
-      [{ "id": number, "name": string }, ...]
-    """
-    return data.GENRES
+    cur.execute("select * from genres")
+    rows = cur.fetchall()
+
+    con.close()
+
+    return [dict(row) for row in rows]
 
 
 @app.get("/movies")
@@ -75,9 +83,21 @@ def list_movies(
     Response shape (array):
       [{ "id": number, "title": string, "genres": [number], ... }, ...]
     """
-    movies = list(data.MOVIES)
 
-    if q:
+    con = sqlite3.connect(DB_FILE)
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
+
+    cur.execute("select * from movies")
+    rows = cur.fetchall()
+
+    con.close()
+
+    
+
+    movies = rows
+
+    """if q:
         movies = [m for m in movies if q.lower() in m["title"].lower()]
     if genre_id:
         movies = [m for m in movies if genre_id in m["genres"]]
@@ -95,8 +115,11 @@ def list_movies(
     # Expand genre objects (id+name) for the UI
     genre_by_id = {g["id"]: g for g in data.GENRES}
     for m in movies:
-        m["genre_objects"] = [genre_by_id[g] for g in m["genres"] if g in genre_by_id]
-    return movies
+        m["genre_objects"] = [genre_by_id[g] for g in m["genres"] if g in genre_by_id]"""
+    
+    return [dict(row) for row in rows]
+
+
 
 @app.get("/movies/{movie_id}")
 def get_movie(movie_id: int):
@@ -107,12 +130,21 @@ def get_movie(movie_id: int):
     Response shape (object):
       Includes "genre_objects" like the list endpoint.
     """
+    con = sqlite3.connect(DB_FILE)
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
+
+    cur.execute("select * from movies where movieid = {movie_id}")
+    rows = cur.fetchall()
+
+    con.close()
+
     for m in data.MOVIES:
-        if m["id"] == movie_id:
-            genre_by_id = {g["id"]: g for g in data.GENRES}
+        if m["movieid"] == movie_id:
+            genre_by_id = {g["movieid"]: g for g in data.GENRES}
             m["genre_objects"] = [genre_by_id[g] for g in m["genres"] if g in genre_by_id]
             return m
     raise HTTPException(status_code=404, detail="Movie not found")
 
 # Run with:
-#   uvicorn backend.main:app --reload --port 8000
+#   uvicorn backend.api:app --reload --port 8000
